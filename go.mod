@@ -1,3 +1,3 @@
-module rapdb
+module Projet_Algo
 
-go 1.25
+go 1.22
