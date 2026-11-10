@@ -4,6 +4,28 @@
 // structure Database qui regroupe l'ensemble des tables.
 package database
 
+import (
+	"errors"
+)
+
+// Erreurs renvoyées par le moteur. Elles sont enveloppées avec %w pour
+// ajouter du contexte (nom de table, de colonne...) tout en restant
+// détectables avec errors.Is.
+var (
+	ErrInvalidName       = errors.New("nom invalide")
+	ErrTableExists       = errors.New("table déjà existante")
+	ErrTableNotFound     = errors.New("table introuvable")
+	ErrNoColumns         = errors.New("aucune colonne définie")
+	ErrDuplicateColumn   = errors.New("colonne en double")
+	ErrInvalidType       = errors.New("type de colonne invalide")
+	ErrInvalidPrimaryKey = errors.New("clé primaire invalide")
+
+	ErrUnknownColumn      = errors.New("colonne inconnue")
+	ErrTypeMismatch       = errors.New("type de valeur incorrect")
+	ErrNotNullViolation   = errors.New("valeur obligatoire manquante")
+	ErrPrimaryKeyProvided = errors.New("la clé primaire est générée par le moteur")
+)
+
 // DataType est le type déclaré d'une colonne.
 type DataType int
 

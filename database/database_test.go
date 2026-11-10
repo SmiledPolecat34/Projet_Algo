@@ -59,6 +59,23 @@ func TestValueUsableAsMapKey(t *testing.T) {
 	}
 }
 
+// fakeIndex est un index minimal, utilisé uniquement dans les tests pour
+// vérifier que le contrat Index est implémentable. Ce n'est pas un vrai index :
+// les implémentations réelles appartiennent à la partie « recherches et index ».
+type fakeIndex struct {
+	added  []Value
+	rowIDs []int
+}
+
+func (f *fakeIndex) Add(v Value, rowID int) {
+	f.added = append(f.added, v)
+	f.rowIDs = append(f.rowIDs, rowID)
+}
+func (f *fakeIndex) Lookup(v Value) []int { return nil }
+
+// Vérification à la compilation : *fakeIndex respecte l'interface Index.
+var _ Index = (*fakeIndex)(nil)
+
 func TestNewDatabase(t *testing.T) {
 	db := NewDatabase()
 	if db == nil || db.tables == nil {
