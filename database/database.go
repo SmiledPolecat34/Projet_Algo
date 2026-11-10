@@ -25,6 +25,9 @@ var (
 	ErrTypeMismatch       = errors.New("type de valeur incorrect")
 	ErrNotNullViolation   = errors.New("valeur obligatoire manquante")
 	ErrPrimaryKeyProvided = errors.New("la clé primaire est générée par le moteur")
+
+	ErrInvalidReference    = errors.New("clé étrangère mal définie")
+	ErrForeignKeyViolation = errors.New("clé étrangère vers une ligne inexistante")
 )
 
 // DataType est le type déclaré d'une colonne.

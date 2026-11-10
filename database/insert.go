@@ -14,12 +14,14 @@ import "fmt"
 //  1. la table existe ;
 //  2. chaque colonne fournie existe et n'est pas la clé primaire ;
 //  3. chaque colonne NOT NULL reçoit une valeur non NULL ;
-//  4. chaque valeur non NULL a le type déclaré de sa colonne.
+//  4. chaque valeur non NULL a le type déclaré de sa colonne ;
+//  5. chaque clé étrangère non NULL désigne une ligne existante.
 //
 // Après l'ajout, chaque index de la table est mis à jour via Index.Add.
 //
 // Complexité : O(c + k) amorti, c = nombre de colonnes, k = nombre d'index
-// (l'ajout en fin de slice est O(1) amorti ; chaque Add dépend de
+// (chaque vérification de clé étrangère est O(1) ;
+// l'ajout en fin de slice est O(1) amorti ; chaque Add dépend de
 // l'implémentation de l'index, O(1) pour un index de hachage).
 func (db *Database) InsertRow(tableName string, values map[string]Value) (int64, error) {
 	t, err := db.GetTable(tableName)
@@ -58,6 +60,15 @@ func (db *Database) InsertRow(tableName string, values map[string]Value) (int64,
 		if v.Type != col.Type {
 			return 0, fmt.Errorf("%w : colonne %q attend %s, reçu %s", ErrTypeMismatch, col.Name, col.Type, v.Type)
 		}
+
+		// 5. Clé étrangère : la ligne référencée doit exister.
+		// La table référencée existe forcément (vérifié par CreateTable,
+		// et le moteur ne supprime jamais de table).
+		if col.References != "" && !db.tables[col.References].hasID(v.Int) {
+			return 0, fmt.Errorf("%w : %s.%s = %d n'existe pas dans %q",
+				ErrForeignKeyViolation, t.Name, col.Name, v.Int, col.References)
+		}
+
 		row[i] = normalize(v)
 	}
 

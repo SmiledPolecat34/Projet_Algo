@@ -57,7 +57,9 @@ type Table struct {
 //   - le nom de la table est un identifiant valide et n'est pas déjà utilisé ;
 //   - il y a au moins une colonne ;
 //   - chaque colonne a un nom valide, unique dans la table, et un type connu ;
-//   - au plus une colonne est clé primaire, et elle est de type TypeInt.
+//   - au plus une colonne est clé primaire, et elle est de type TypeInt ;
+//   - chaque clé étrangère (References) est correctement définie
+//     (voir checkReference).
 //
 // Une clé primaire est toujours considérée comme NOT NULL : sa valeur sera
 // générée par le moteur (1, 2, 3, ...) lors des insertions.
@@ -107,6 +109,12 @@ func (db *Database) CreateTable(name string, columns []Column) (*Table, error) {
 			pkPos = i
 		}
 
+		if col.References != "" {
+			if err := db.checkReference(name, col); err != nil {
+				return nil, err
+			}
+		}
+
 		colIndex[col.Name] = i
 	}
 
@@ -120,6 +128,42 @@ func (db *Database) CreateTable(name string, columns []Column) (*Table, error) {
 	}
 	db.tables[name] = t
 	return t, nil
+}
+
+// checkReference vérifie la définition d'une clé étrangère (colonne dont le
+// champ References est renseigné) lors de la création de la table tableName :
+//   - la table référencée existe déjà (elle doit donc être créée avant) ;
+//   - elle possède une clé primaire, vers laquelle pointe la référence ;
+//   - la colonne est de type INT, comme toute clé primaire du moteur ;
+//   - la colonne n'est pas elle-même la clé primaire (générée par le moteur).
+func (db *Database) checkReference(tableName string, col *Column) error {
+	ref, ok := db.tables[col.References]
+	if !ok {
+		return fmt.Errorf("%w : %s.%s référence la table inconnue %q",
+			ErrInvalidReference, tableName, col.Name, col.References)
+	}
+	if ref.pkPos == -1 {
+		return fmt.Errorf("%w : la table %q n'a pas de clé primaire", ErrInvalidReference, ref.Name)
+	}
+	if col.Type != TypeInt {
+		return fmt.Errorf("%w : %s.%s doit être de type INT", ErrInvalidReference, tableName, col.Name)
+	}
+	if col.PrimaryKey {
+		return fmt.Errorf("%w : la clé primaire %s.%s ne peut pas être une clé étrangère",
+			ErrInvalidReference, tableName, col.Name)
+	}
+	return nil
+}
+
+// hasID indique si la table contient une ligne dont la clé primaire vaut id.
+//
+// Complexité O(1), sans parcours ni index : les identifiants sont générés
+// séquentiellement à partir de 1 et aucune ligne n'est jamais supprimée, donc
+// les identifiants existants sont exactement 1, 2, ..., RowCount() (la ligne
+// d'id k étant à la position k-1). Si la suppression était ajoutée un jour,
+// cette fonction devrait utiliser un index sur la clé primaire.
+func (t *Table) hasID(id int64) bool {
+	return t.pkPos != -1 && id >= 1 && id <= int64(len(t.rows))
 }
 
 // ColumnIndex renvoie la position de la colonne name dans le schéma.
