@@ -20,6 +20,11 @@ var (
 	ErrDuplicateColumn   = errors.New("colonne en double")
 	ErrInvalidType       = errors.New("type de colonne invalide")
 	ErrInvalidPrimaryKey = errors.New("clé primaire invalide")
+
+	ErrUnknownColumn      = errors.New("colonne inconnue")
+	ErrTypeMismatch       = errors.New("type de valeur incorrect")
+	ErrNotNullViolation   = errors.New("valeur obligatoire manquante")
+	ErrPrimaryKeyProvided = errors.New("la clé primaire est générée par le moteur")
 )
 
 // DataType est le type déclaré d'une colonne.

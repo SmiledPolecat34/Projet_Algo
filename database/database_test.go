@@ -63,11 +63,15 @@ func TestValueUsableAsMapKey(t *testing.T) {
 // vérifier que le contrat Index est implémentable. Ce n'est pas un vrai index :
 // les implémentations réelles appartiennent à la partie « recherches et index ».
 type fakeIndex struct {
-	added []Value
+	added  []Value
+	rowIDs []int
 }
 
-func (f *fakeIndex) Add(v Value, rowID int) { f.added = append(f.added, v) }
-func (f *fakeIndex) Lookup(v Value) []int   { return nil }
+func (f *fakeIndex) Add(v Value, rowID int) {
+	f.added = append(f.added, v)
+	f.rowIDs = append(f.rowIDs, rowID)
+}
+func (f *fakeIndex) Lookup(v Value) []int { return nil }
 
 // Vérification à la compilation : *fakeIndex respecte l'interface Index.
 var _ Index = (*fakeIndex)(nil)
