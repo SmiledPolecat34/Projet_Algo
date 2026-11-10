@@ -1,5 +1,7 @@
 package database
 
+import "fmt"
+
 // Column décrit une colonne du schéma d'une table.
 type Column struct {
 	Name       string   // nom unique dans la table
@@ -16,16 +18,21 @@ type Column struct {
 // qu'une seule fois, dans le schéma.
 type Row []Value
 
-// Index est le contrat minimal que doit respecter un index pour être tenu à
-// jour automatiquement lors des insertions.
+// Index est le contrat commun à tous les index d'une colonne.
 //
 // Les implémentations concrètes (index de hachage, index trié, ...) et les
 // fonctions de recherche appartiennent à la partie « recherches et index ».
-// Le moteur de stockage se contente d'appeler Add après chaque insertion.
+// Le moteur de stockage se contente d'appeler Add après chaque insertion ;
+// Lookup est utilisé par les recherches (SelectValues).
 type Index interface {
 	// Add enregistre que la ligne située à la position rowID contient la
 	// valeur v dans la colonne indexée.
 	Add(v Value, rowID int)
+
+	// Lookup renvoie les positions (rowID) des lignes dont la colonne
+	// indexée vaut exactement v. Renvoie une slice vide (ou nil) si aucune
+	// ligne ne correspond.
+	Lookup(v Value) []int
 }
 
 // Table contient le schéma (colonnes) et les données (lignes) d'une table.
@@ -42,6 +49,77 @@ type Table struct {
 	rows     []Row            // lignes stockées, dans l'ordre d'insertion
 	nextID   int64            // prochaine valeur de la clé primaire
 	indexes  map[string]Index // nom de colonne -> index associé
+}
+
+// CreateTable crée une table vide à partir de son nom et de son schéma.
+//
+// Règles vérifiées :
+//   - le nom de la table est un identifiant valide et n'est pas déjà utilisé ;
+//   - il y a au moins une colonne ;
+//   - chaque colonne a un nom valide, unique dans la table, et un type connu ;
+//   - au plus une colonne est clé primaire, et elle est de type TypeInt.
+//
+// Une clé primaire est toujours considérée comme NOT NULL : sa valeur sera
+// générée par le moteur (1, 2, 3, ...) lors des insertions.
+//
+// Complexité : O(c), où c est le nombre de colonnes (une passe sur le schéma,
+// chaque vérification de doublon étant un accès O(1) à une map).
+func (db *Database) CreateTable(name string, columns []Column) (*Table, error) {
+	if !isValidName(name) {
+		return nil, fmt.Errorf("%w : table %q", ErrInvalidName, name)
+	}
+	if _, exists := db.tables[name]; exists {
+		return nil, fmt.Errorf("%w : %q", ErrTableExists, name)
+	}
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("%w : table %q", ErrNoColumns, name)
+	}
+
+	// Copie du schéma : l'appelant peut modifier sa slice ensuite sans
+	// altérer la table.
+	cols := make([]Column, len(columns))
+	copy(cols, columns)
+
+	colIndex := make(map[string]int, len(cols))
+	pkPos := -1
+
+	for i := range cols {
+		col := &cols[i]
+
+		if !isValidName(col.Name) {
+			return nil, fmt.Errorf("%w : colonne %q de la table %q", ErrInvalidName, col.Name, name)
+		}
+		if _, dup := colIndex[col.Name]; dup {
+			return nil, fmt.Errorf("%w : %q dans la table %q", ErrDuplicateColumn, col.Name, name)
+		}
+		if !col.Type.IsValid() {
+			return nil, fmt.Errorf("%w : colonne %q (%d)", ErrInvalidType, col.Name, int(col.Type))
+		}
+
+		if col.PrimaryKey {
+			if pkPos != -1 {
+				return nil, fmt.Errorf("%w : plusieurs clés primaires dans la table %q", ErrInvalidPrimaryKey, name)
+			}
+			if col.Type != TypeInt {
+				return nil, fmt.Errorf("%w : la colonne %q doit être de type INT", ErrInvalidPrimaryKey, col.Name)
+			}
+			col.NotNull = true
+			pkPos = i
+		}
+
+		colIndex[col.Name] = i
+	}
+
+	t := &Table{
+		Name:     name,
+		Columns:  cols,
+		colIndex: colIndex,
+		pkPos:    pkPos,
+		nextID:   1,
+		indexes:  make(map[string]Index),
+	}
+	db.tables[name] = t
+	return t, nil
 }
 
 // ColumnIndex renvoie la position de la colonne name dans le schéma.

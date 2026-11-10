@@ -4,6 +4,24 @@
 // structure Database qui regroupe l'ensemble des tables.
 package database
 
+import (
+	"errors"
+	"fmt"
+)
+
+// Erreurs renvoyées par le moteur. Elles sont enveloppées avec %w pour
+// ajouter du contexte (nom de table, de colonne...) tout en restant
+// détectables avec errors.Is.
+var (
+	ErrInvalidName       = errors.New("nom invalide")
+	ErrTableExists       = errors.New("table déjà existante")
+	ErrTableNotFound     = errors.New("table introuvable")
+	ErrNoColumns         = errors.New("aucune colonne définie")
+	ErrDuplicateColumn   = errors.New("colonne en double")
+	ErrInvalidType       = errors.New("type de colonne invalide")
+	ErrInvalidPrimaryKey = errors.New("clé primaire invalide")
+)
+
 // DataType est le type déclaré d'une colonne.
 type DataType int
 
@@ -76,4 +94,31 @@ type Database struct {
 // NewDatabase crée une base de données vide, prête à recevoir des tables.
 func NewDatabase() *Database {
 	return &Database{tables: make(map[string]*Table)}
+}
+
+// GetTable renvoie la table nommée name, ou ErrTableNotFound.
+// Complexité : O(1) en moyenne (accès à une map).
+func (db *Database) GetTable(name string) (*Table, error) {
+	t, ok := db.tables[name]
+	if !ok {
+		return nil, fmt.Errorf("%w : %q", ErrTableNotFound, name)
+	}
+	return t, nil
+}
+
+// isValidName vérifie qu'un nom de table ou de colonne est un identifiant
+// simple : non vide, composé de lettres ASCII, de chiffres et de '_', et ne
+// commençant pas par un chiffre (ex. "albums", "artist_id").
+func isValidName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
+		isDigit := r >= '0' && r <= '9'
+		if !isLetter && !(isDigit && i > 0) {
+			return false
+		}
+	}
+	return true
 }
