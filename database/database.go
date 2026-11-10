@@ -1,7 +1,7 @@
-// Package database implémente un SGBD relationnel simplifié, stocké en mémoire.
-//
 // Ce fichier contient la représentation des valeurs (cellules) et la
 // structure Database qui regroupe l'ensemble des tables.
+// La documentation du package se trouve dans doc.go.
+
 package database
 
 import (
